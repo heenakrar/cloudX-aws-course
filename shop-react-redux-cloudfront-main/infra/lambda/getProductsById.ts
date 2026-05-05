@@ -1,65 +1,54 @@
-const products = [
-  {
-    id: "1",
-    title: "Product 1",
-    price: 10,
-    description: "Short Description 1",
-  },
-  {
-    id: "2",
-    title: "Product 2",
-    price: 20,
-    description: "Short Description 2",
-  },
-  {
-    id: "3",
-    title: "Product 3",
-    price: 30,
-    description: "Short Description 3",
-  },
-  {
-    id: "4",
-    title: "Product 4",
-    price: 40,
-    description: "Short Description 4",
-  },
-  {
-    id: "5",
-    title: "Product 5",
-    price: 50,
-    description: "Short Description 5",
-  },
-  {
-    id: "6",
-    title: "Product 6",
-    price: 60,
-    description: "Short Description 6",
-  },
-];
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { GetCommand, DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+const client = new DynamoDBClient({});
+const docClient = DynamoDBDocumentClient.from(client);
 
 export const handler = async (event: any) => {
-  try {
-    const productId = event.pathParameters?.productId;
-    
-    const product = products.find((p) => p.id === productId);
+  console.log('Incoming Request:', JSON.stringify(event, null, 2));
+  
+  const productId = event.pathParameters?.productId;
 
-    if (product) {
+  if (!productId) {
+    return {
+      statusCode: 400,
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify({ message: "Product ID is required" }),
+    };
+  }
+
+  try {
+    const [productRes, stockRes] = await Promise.all([
+      docClient.send(new GetCommand({ TableName: process.env.PRODUCTS_TABLE, Key: { id: productId } })),
+      docClient.send(new GetCommand({ TableName: process.env.STOCKS_TABLE, Key: { product_id: productId } }))
+    ]);
+
+    if (!productRes.Item) {
+      console.log(`Product ${productId} not found`);
       return {
-        statusCode: 200,
+        statusCode: 404,
         headers: { "Access-Control-Allow-Origin": "*" },
-        body: JSON.stringify(product),
+        body: JSON.stringify({ message: "Product not found" }),
       };
     }
 
     return {
-      statusCode: 404,
-      headers: { "Access-Control-Allow-Origin": "*" },
-      body: JSON.stringify({ message: "Product not found" }),
+      statusCode: 200,
+      headers: { 
+        "Access-Control-Allow-Origin": "*",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        ...productRes.Item,
+        count: stockRes.Item ? stockRes.Item.count : 0
+      }),
     };
-  } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: "Internal Server Error" }),
+  } catch (err: any) {
+    console.error(`Error fetching product ${productId}:`, err);
+    return { 
+      statusCode: 500, 
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify({ message: "Internal Server Error" }) 
     };
   }
 };

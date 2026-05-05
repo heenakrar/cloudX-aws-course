@@ -9,12 +9,16 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
+    "seed": "ts-node scripts/seed-data.ts",
     "full-deploy": "cd ../shop-react-redux-cloudfront-main && npm run build && cd ../infra && cdk deploy"
   },
   "devDependencies": {
+    "@aws-cdk/aws-lambda-nodejs": "^1.203.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.12.2",
+    "@types/uuid": "^10.0.0",
     "aws-cdk": "2.1119.0",
+    "aws-sdk-client-mock": "^4.1.0",
     "esbuild": "^0.28.0",
     "jest": "^30.3.0",
     "ts-jest": "^29.4.9",
@@ -22,7 +26,13 @@
     "typescript": "~5.9.3"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1041.0",
+    "@aws-sdk/lib-dynamodb": "^3.1041.0",
+    "@types/aws-lambda": "^8.10.161",
+    "@types/source-map-support": "^0.5.10",
     "aws-cdk-lib": "^2.248.0",
-    "constructs": "^10.5.0"
+    "aws-lambda": "^1.0.7",
+    "constructs": "^10.5.0",
+    "source-map-support": "^0.5.21"
   }
 }
