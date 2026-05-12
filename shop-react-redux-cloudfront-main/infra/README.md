@@ -13,12 +13,14 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app.
 * `npx cdk diff`    compare deployed stack with current state
 * `npx cdk synth`   emits the synthesized CloudFormation template
 
+* `npm run seed`   run this from infra folder to set up the data in DynamoDB
+
+
 From the infra folder, just run `npm run full-deploy`. This will automatically build the React app and then deploy the infrastructure.
 
 Automated CDK deployment:
 CloudFront URL: dd68w7uhazhum.cloudfront.net
 
-Manual deployment:
-S3 Website URL: https://web-app-react-aws-deploy.s3.eu-north-1.amazonaws.com/index.html
-Cloudfront URL created by cloudformation: d2hsywb3ftpcmj.cloudfront.net
+API Gateway Generated URL after deployment to get all products in JSON format - https://d850b7qo24.execute-api.eu-north-1.amazonaws.com/prod/products
 
+API Gateway Generated URL after deployment to get specific products in JSON format - https://d850b7qo24.execute-api.eu-north-1.amazonaws.com/prod/products/c3d4e5f6-g7h8-i9j0-k1l2-m3n4o5p6q7r8
