@@ -6,26 +6,31 @@ import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigw from "aws-cdk-lib/aws-apigateway";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import * as sqs from "aws-cdk-lib/aws-sqs";
+
+interface ImportServiceStackProps extends cdk.StackProps {
+  catalogItemsQueue: sqs.IQueue;
+}
 
 export class ImportServiceStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: ImportServiceStackProps) {
     super(scope, id, props);
 
     const bucket = new s3.Bucket(this, "ImportBucket", {
       versioned: true,
-      removalPolicy: cdk.RemovalPolicy.DESTROY, 
-      autoDeleteObjects: true, 
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
       cors: [
         {
           allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.GET],
-          allowedOrigins: ["*"], 
+          allowedOrigins: ["*"],
           allowedHeaders: ["*"],
         },
       ],
     });
 
     new s3deploy.BucketDeployment(this, "DeployEmptyFolder", {
-      sources: [s3deploy.Source.data("uploaded/.keep", "")], 
+      sources: [s3deploy.Source.data("uploaded/.keep", "")],
       destinationBucket: bucket,
     });
 
@@ -33,7 +38,7 @@ export class ImportServiceStack extends cdk.Stack {
       this,
       "ImportProductsFileHandler",
       {
-        entry: "lambda/importProductsFile.ts", 
+        entry: "lambda/importProductsFile.ts",
         handler: "handler",
         runtime: lambda.Runtime.NODEJS_20_X,
         environment: {
@@ -57,7 +62,7 @@ export class ImportServiceStack extends cdk.Stack {
       new apigw.LambdaIntegration(importProductsFile),
       {
         requestParameters: {
-          "method.request.querystring.name": true, 
+          "method.request.querystring.name": true,
         },
       },
     );
@@ -69,8 +74,13 @@ export class ImportServiceStack extends cdk.Stack {
         entry: "lambda/importFileParser.ts",
         handler: "handler",
         runtime: lambda.Runtime.NODEJS_20_X,
+        environment: {
+          CATALOG_ITEMS_QUEUE_URL: props.catalogItemsQueue.queueUrl,
+        },
       },
     );
+
+    props.catalogItemsQueue.grantSendMessages(importFileParser);
 
     bucket.grantRead(importFileParser);
     bucket.grantReadWrite(importFileParser);
