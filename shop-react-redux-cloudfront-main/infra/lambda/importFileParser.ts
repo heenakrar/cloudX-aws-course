@@ -5,7 +5,7 @@ import {
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import csv from "csv-parser";
+import csv = require("csv-parser"); 
 
 const s3 = new S3Client({});
 const sqs = new SQSClient({});

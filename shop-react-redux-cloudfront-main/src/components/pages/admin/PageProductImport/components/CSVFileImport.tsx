@@ -25,11 +25,24 @@ export default function CSVFileImport({ url, title }: CSVFileImportProps) {
   const uploadFile = async () => {
     if (!file) return;
 
-    console.log("uploadFile to", url);
+    const authorizationToken = localStorage.getItem("authorization_token")?.trim();
+    if (!authorizationToken) {
+      console.error("Missing authorization_token in localStorage");
+      return;
+    }
+
+    const authorizationHeader = authorizationToken.startsWith("Basic ")
+      ? authorizationToken
+      : `Basic ${authorizationToken}`;
+
+    console.log("uploadFile to", url, "Authorization:", authorizationHeader);
 
     try {
       const response = await fetch(`${url}?name=${encodeURIComponent(file.name)}`, {
         method: "GET",
+        headers: {
+          Authorization: authorizationHeader,
+        },
       });
 
       if (!response.ok) throw new Error('Failed to get signed URL');
