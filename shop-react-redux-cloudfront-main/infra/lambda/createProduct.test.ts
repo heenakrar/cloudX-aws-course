@@ -70,3 +70,4 @@ describe('createProduct handler', () => {
     expect(sendMock).toHaveBeenCalledTimes(1);
   });
 });
+export {};

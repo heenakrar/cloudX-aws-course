@@ -7,6 +7,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigw from "aws-cdk-lib/aws-apigateway";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as sqs from "aws-cdk-lib/aws-sqs";
+import * as iam from "aws-cdk-lib/aws-iam";
 
 interface ImportServiceStackProps extends cdk.StackProps {
   catalogItemsQueue: sqs.IQueue;
@@ -15,6 +16,13 @@ interface ImportServiceStackProps extends cdk.StackProps {
 export class ImportServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ImportServiceStackProps) {
     super(scope, id, props);
+
+    const authorizerFunctionArn = cdk.Fn.importValue("BasicAuthorizerFunctionArn");
+    const authorizerFunction = lambda.Function.fromFunctionArn(
+      this,
+      "BasicAuthorizerFunction",
+      authorizerFunctionArn
+    );
 
     const bucket = new s3.Bucket(this, "ImportBucket", {
       versioned: true,
@@ -53,8 +61,19 @@ export class ImportServiceStack extends cdk.Stack {
       defaultCorsPreflightOptions: {
         allowOrigins: apigw.Cors.ALL_ORIGINS,
         allowMethods: apigw.Cors.ALL_METHODS,
+        allowHeaders: ["Authorization", "Content-Type", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token", "X-Amz-User-Agent"],
       },
     });
+
+    const tokenAuthorizer = new apigw.TokenAuthorizer(
+      this,
+      "ImportTokenAuthorizerV2",
+      {
+        handler: authorizerFunction,
+        identitySource: apigw.IdentitySource.header("Authorization"),
+        resultsCacheTtl: cdk.Duration.seconds(0),
+      },
+    );
 
     const importResource = api.root.addResource("import");
     importResource.addMethod(
@@ -64,6 +83,8 @@ export class ImportServiceStack extends cdk.Stack {
         requestParameters: {
           "method.request.querystring.name": true,
         },
+        authorizer: tokenAuthorizer,
+        authorizationType: apigw.AuthorizationType.CUSTOM,
       },
     );
 
