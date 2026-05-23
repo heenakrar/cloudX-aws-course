@@ -4,9 +4,11 @@ import {
   CopyObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import csv from "csv-parser";
 
 const s3 = new S3Client({});
+const sqs = new SQSClient({});
 
 export const handler = async (event: any) => {
   for (const record of event.Records) {
@@ -21,37 +23,62 @@ export const handler = async (event: any) => {
     );
 
     const stream = s3Response.Body as any;
+    const processingPromises: Promise<any>[] = [];
 
-    await new Promise((resolve, reject) => {
-      stream
-        .pipe(csv())
-        .on("data", (data: any) => {
-          console.log("CSV Record:", JSON.stringify(data));
-        })
-        .on("end", () => {
-          console.log("Finished processing CSV.");
-          resolve(null);
-        })
-        .on("error", (error: any) => {
-          reject(error);
-        });
-    });
+    try {
+      await new Promise((resolve, reject) => {
+        stream
+          .pipe(csv({ separator: ",", strict: true }))
+          .on("data", (data: any) => {
+            console.log("CSV Record:", JSON.stringify(data));
 
-    console.log(`Copying to ${targetKey}`);
-    await s3.send(
-      new CopyObjectCommand({
-        Bucket: bucket,
-        CopySource: `${bucket}/${key}`,
-        Key: targetKey,
-      }),
-    );
+            const sendSqsPromise = sqs.send(
+              new SendMessageCommand({
+                QueueUrl: process.env.CATALOG_ITEMS_QUEUE_URL,
+                MessageBody: JSON.stringify(data),
+              }),
+            );
 
-    console.log(`Deleting from ${key}`);
-    await s3.send(
-      new DeleteObjectCommand({
-        Bucket: bucket,
-        Key: key,
-      }),
-    );
+            processingPromises.push(sendSqsPromise);
+          })
+          .on("end", async () => {
+            try {
+              await Promise.all(processingPromises);
+              console.log(
+                "Finished processing CSV and forwarding messages to SQS.",
+              );
+              resolve(null);
+            } catch (err) {
+              reject(err);
+            }
+          })
+          .on("error", (error: any) => {
+            reject(error);
+          });
+      });
+
+      console.log(`Copying to ${targetKey}`);
+      await s3.send(
+        new CopyObjectCommand({
+          Bucket: bucket,
+          CopySource: `${bucket}/${key}`,
+          Key: targetKey,
+        }),
+      );
+
+      console.log(`Deleting from ${key}`);
+      await s3.send(
+        new DeleteObjectCommand({
+          Bucket: bucket,
+          Key: key,
+        }),
+      );
+    } catch (pipelineError) {
+      console.error(
+        "CRITICAL: Pipeline processing failed. S3 file preservation maintained.",
+        pipelineError,
+      );
+      throw pipelineError;
+    }
   }
 };
